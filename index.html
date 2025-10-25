@@ -2,151 +2,283 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Maze Game - Pay to Play</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>🌀 Maze Runner — Farcaster Mini App</title>
 <style>
-  * { margin:0; padding:0; box-sizing:border-box; }
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    font-family: Arial, sans-serif;
-    background: linear-gradient(135deg,#667eea 0%,#764ba2 100%);
-    display: flex; justify-content: center; align-items: center; min-height:100vh;
+    background: linear-gradient(135deg, #0a0e13 0%, #1a1f2e 100%);
+    color: #e7ecf0;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100dvh;
+    padding: 20px;
   }
-  .game-container {
-    background:white; border-radius:20px; padding:20px; box-shadow:0 20px 60px rgba(0,0,0,0.3);
-    max-width:500px; width:100%; text-align:center; position:relative;
+  .wrap { width: min(900px, 96vw); position: relative; }
+  .card { background: #12171b; border: 1px solid #1f2a32; border-radius: 14px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+  .overlay { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(8,11,14,.85); backdrop-filter: blur(4px); padding: 16px; z-index: 100; }
+  .hidden { display: none !important; }
+  h1 { font-size: 28px; font-weight: 900; margin-bottom: 12px; text-shadow: 0 2px 10px rgba(56,189,248,0.5); }
+  .btn-primary {
+    padding: 14px 28px;
+    background: linear-gradient(135deg, #ff8c42, #ff6b1a);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-weight: 900;
+    font-size: 16px;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(255,107,26,0.4);
+    transition: all 0.2s;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
   }
-  canvas { border:3px solid #667eea; border-radius:10px; background:white; margin:0 auto; display:block; }
-  .controls { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; max-width:200px; margin:15px auto 0; }
-  .control-btn { background:#667eea; color:white; border:none; padding:15px; font-size:20px; border-radius:10px; cursor:pointer; font-weight:bold; }
-  .control-btn.empty { background:transparent; cursor:default; }
-  .control-btn:hover { background:#5568d3; transform:scale(1.05); }
-  .control-btn:active { transform:scale(0.95); }
-  .button-group { display:flex; gap:10px; margin-top:15px; }
-  .action-btn { flex:1; background:#764ba2; color:white; border:none; padding:12px; border-radius:10px; cursor:pointer; font-weight:bold; }
-  .action-btn.success { background:#10b981; }
-  .overlay { position:fixed; inset:0; display:grid; place-items:center; background:rgba(0,0,0,0.8); z-index:100; }
-  .overlay button { padding:15px 30px; font-size:18px; font-weight:bold; background:#ff8c42; color:white; border:none; border-radius:12px; cursor:pointer; }
-  .message { text-align:center; margin-top:15px; padding:10px; border-radius:10px; font-weight:bold; display:none; }
-  .message.show { display:block; }
-  .message.win { background:#d1fae5; color:#065f46; }
+  .btn-primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(255,107,26,0.5);
+  }
+  .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+  .btn-secondary { padding: 12px 24px; background: linear-gradient(135deg, #38bdf8, #34d399); color: #0a1929; border: none; border-radius: 10px; font-weight: 900; font-size: 14px; cursor: pointer; box-shadow: 0 4px 15px rgba(56,189,248,0.3); transition: all 0.2s; letter-spacing: 0.5px; text-transform: uppercase; }
+  .btn-reset { background: linear-gradient(135deg, #f43f5e, #f59e0b); }
+  #canvas {
+    background: #0d1117;
+    border: 3px solid #1f2937;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    max-width: 100%;
+    display: block;
+    margin: 20px auto;
+    touch-action: none;
+  }
+  #controls { width: 100%; margin-top: 15px; display: flex; flex-direction: column; gap: 15px; }
+  .control-row { background: rgba(15,23,42,0.8); border: 2px solid #1e293b; border-radius: 12px; padding: 15px; display: flex; align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap; }
+  .control-group { display: flex; align-items: center; gap: 10px; }
+  label { font-weight: 700; font-size: 14px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; }
+  .info { color: #94a3b8; font-size: 13px; }
+  #status { margin-top: 15px; font-size: 13px; line-height: 1.5; background: #0f151a; border: 1px solid #1f2a32; border-radius: 10px; padding: 12px; }
+  #status b { color: #cde7d8; } #status .ok { color: #4ade80; } #status .warn { color: #fbbf24; } #status .err { color: #f87171; } #status a { color: #86c6ff; text-decoration: none; }
+  #play-again { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 16px 32px; background: linear-gradient(135deg, #ff8c42, #ff6b1a); color: #fff; border: none; border-radius: 12px; font-weight: 900; font-size: 18px; cursor: pointer; box-shadow: 0 10px 40px rgba(255,107,26,0.5); z-index: 50; }
+  @keyframes bounce { 0%, 100% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; } 50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; } }
 </style>
 </head>
 <body>
-<div class="game-container">
-    <div class="header"><h1>🎮 Maze Challenge</h1></div>
-    <canvas id="mazeCanvas" width="400" height="400"></canvas>
-    <div class="controls">
-      <div class="control-btn empty"></div>
-      <button class="control-btn" onclick="move('up')">↑</button>
-      <div class="control-btn empty"></div>
-      <button class="control-btn" onclick="move('left')">←</button>
-      <button class="control-btn" onclick="move('down')">↓</button>
-      <button class="control-btn" onclick="move('right')">→</button>
+<div class="wrap">
+  <!-- Intro Overlay -->
+  <div id="intro-overlay" class="overlay">
+    <div class="card" role="dialog" aria-modal="true">
+      <h1>🌀 Play Maze Runner</h1>
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <button id="play" class="btn-primary">💰 Pay & Play</button>
+      </div>
+      <div id="status" class="hidden"></div>
     </div>
-    <div class="button-group">
-      <button class="action-btn" onclick="resetGame()">🔄 Reset</button>
-      <button class="action-btn success" onclick="nextLevel()">Next Level →</button>
-    </div>
-    <div class="message" id="message"></div>
-</div>
-
-<!-- Payment Overlay -->
-<div id="payOverlay" class="overlay">
-  <div>
-    <h2>💰 Pay to Play</h2>
-    <button id="payBtn">Pay & Start Game</button>
   </div>
+
+  <canvas id="canvas" width="900" height="600"></canvas>
+
+  <div id="controls">
+    <div class="control-row">
+      <div class="control-group">
+        <button id="resetBtn" class="btn-secondary btn-reset">🔄 RESET</button>
+      </div>
+      <div class="control-group">
+        <span class="info">Steps:</span>
+        <span class="score-display" id="stepDisplay">0</span>
+        <span class="info">Goal:</span>
+        <span class="score-display" id="goalDisplay">0</span>
+      </div>
+    </div>
+  </div>
+
+  <button id="play-again" class="hidden">💰 Pay & Play Again</button>
 </div>
 
 <script type="module">
 import { sdk } from 'https://esm.sh/@farcaster/miniapp-sdk';
 sdk.actions.ready();
 
-const canvas = document.getElementById('mazeCanvas');
-const ctx = canvas.getContext('2d');
-const payOverlay = document.getElementById('payOverlay');
-const payBtn = document.getElementById('payBtn');
-const messageEl = document.getElementById('message');
-
-let gameState = {
-    level:1, moves:0, startTime:Date.now(), difficulty:'easy',
-    playerPos:{x:0,y:0}, goalPos:{x:0,y:0}, maze:[], cellSize:40, isComplete:false,
-    gameActive:false
-};
-
-const difficulties = { easy:10, medium:15, hard:20 };
-
-// ===== Payment Gate =====
+/* ===== CONFIG ===== */
+const USE_BASE_SEPOLIA = false;
 const RECIPIENT = "0xc4EB7B433f9911a15c18729D8BE5e5fDa1187E1a";
 const AMOUNT_ETH = "0.00001";
-const TARGET = { chainId:"0x2105", explorer:"https://basescan.org/tx/" };
 
-function parseEther(x) { const [w,f=""]=String(x).split('.'); const frac=(f+'0'.repeat(18)).slice(0,18); return '0x'+(BigInt(w)*10n**18n+BigInt(frac)).toString(16); }
-async function getProvider() { try { return await sdk.wallet.getEthereumProvider() ?? window.ethereum ?? null; } catch { return window.ethereum ?? null; }
+const BASE_MAINNET = { chainId: "0x2105",  explorer: "https://basescan.org/tx/" };
+const BASE_SEPOLIA = { chainId: "0x14a34", explorer: "https://sepolia.basescan.org/tx/" };
+const TARGET = USE_BASE_SEPOLIA ? BASE_SEPOLIA : BASE_MAINNET;
+
+/* ===== DOM ===== */
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const statusEl = document.getElementById('status');
+const playBtn = document.getElementById('play');
+const playAgainBtn = document.getElementById('play-again');
+const resetBtn = document.getElementById('resetBtn');
+const stepDisplay = document.getElementById('stepDisplay');
+const goalDisplay = document.getElementById('goalDisplay');
+
+const showStatus = () => statusEl.classList.remove('hidden');
+const addLine = html => { showStatus(); statusEl.insertAdjacentHTML('beforeend', `<div>${html}</div>`); };
+const clearStatus = () => statusEl.innerHTML = '';
+const disable = (el, yes=true) => { if (el) el.disabled = yes; };
+
+/* ===== Wallet Helpers ===== */
+function parseEther(x) {
+  const [w, f=""] = String(x).split('.');
+  const frac = (f + '0'.repeat(18)).slice(0, 18);
+  return '0x' + (BigInt(w) * 10n**18n + BigInt(frac)).toString(16);
 }
-async function ensureChain(provider, chainId) { const current=(await provider.request({method:'eth_chainId'}))?.toLowerCase(); if(current===chainId.toLowerCase()) return; await provider.request({method:'wallet_switchEthereumChain',params:[{chainId}]}); }
+
+async function getProvider() {
+  try { const p = await sdk.wallet.getEthereumProvider(); if (p) return p; } catch {}
+  return window.ethereum ?? null;
+}
+
+async function ensureChain(provider, chainId) {
+  const current = (await provider.request({ method: 'eth_chainId' }))?.toLowerCase();
+  if (current === chainId.toLowerCase()) return;
+  try { await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId }] }); } 
+  catch (e) { 
+    if (e?.code === 4902) { 
+      await provider.request({ method: 'wallet_addEthereumChain', params: [{ chainId }] }); 
+      await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId }] }); 
+    } else { throw e; }
+  }
+}
+
 async function requiredPayment() {
-    const provider = await getProvider(); if(!provider) throw new Error('No wallet');
-    const [from] = await provider.request({ method:'eth_requestAccounts' });
-    const hash = await provider.request({ method:'eth_sendTransaction', params:[{from,to:RECIPIENT,value:parseEther(AMOUNT_ETH)}] });
-    return hash;
+  clearStatus();
+  addLine(`<b>Step 1:</b> Locating wallet provider…`);
+  const provider = await getProvider();
+  if (!provider) { addLine(`<span class="err">No wallet available.</span>`); throw new Error('NO_PROVIDER'); }
+  addLine(`<span class="ok">Provider ready.</span>`);
+  addLine(`<b>Step 2:</b> Requesting accounts…`);
+  const [from] = await provider.request({ method: 'eth_requestAccounts' });
+  addLine(`<span class="ok">Account: ${from.slice(0,6)}…${from.slice(-4)}</span>`);
+  addLine(`<b>Step 3:</b> Switching to Base${USE_BASE_SEPOLIA?' Sepolia':''}…`);
+  await ensureChain(provider, TARGET.chainId);
+  addLine(`<span class="ok">On Base${USE_BASE_SEPOLIA?' Sepolia':''}.</span>`);
+  addLine(`<b>Step 4:</b> Sending ${AMOUNT_ETH} ETH to ${RECIPIENT.slice(0,6)}…${RECIPIENT.slice(-4)}…`);
+  const hash = await provider.request({ method: 'eth_sendTransaction', params: [{ from, to: RECIPIENT, value: parseEther(AMOUNT_ETH) }] });
+  addLine(`<span class="ok">TX sent.</span> <a target="_blank" rel="noopener" href="${TARGET.explorer}${hash}">View on Basescan</a>`);
+  return hash;
 }
-async function payThenStart() {
-    try {
-        payBtn.disabled = true;
-        await requiredPayment();
-        payOverlay.style.display='none';
-        gameState.gameActive=true;
-        initGame();
-    } catch(e) { alert('Payment failed.'); payBtn.disabled=false; }
-}
-payBtn.onclick = payThenStart;
 
-// ===== Maze Game Logic =====
-function generateMaze(size) {
-    const maze = Array(size).fill().map(()=>Array(size).fill(1));
-    function carve(x,y){
-        const dirs=[[0,-2],[2,0],[0,2],[-2,0]].sort(()=>Math.random()-0.5);
-        for(const [dx,dy] of dirs){
-            const nx=x+dx, ny=y+dy;
-            if(nx>0&&nx<size-1&&ny>0&&ny<size-1&&maze[ny][nx]===1){
-                maze[y+dy/2][x+dx/2]=0;
-                maze[ny][nx]=0;
-                carve(nx,ny);
-            }
-        }
+async function payThen(action, triggerBtn) {
+  try { disable(triggerBtn,true); await requiredPayment(); await action(); } 
+  catch (e) { console.warn(e); addLine(`<span class="warn">Payment required. Please try again.</span>`); } 
+  finally { disable(triggerBtn,false); }
+}
+
+/* ===== Maze Game State ===== */
+const TILE = 40;
+const ROWS = Math.floor(canvas.height / TILE);
+const COLS = Math.floor(canvas.width / TILE);
+
+let gameState = {
+  maze: [],
+  player: { x: 0, y: 0 },
+  goal: { x: COLS-1, y: ROWS-1 },
+  steps: 0,
+  gameActive: false
+};
+
+/* ===== Maze Generation ===== */
+function generateMaze() {
+  gameState.maze = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
+  for(let r=1;r<ROWS-1;r++) for(let c=1;c<COLS-1;c++) gameState.maze[r][c] = Math.random()<0.7?0:1;
+  gameState.player = { x: 0, y: 0 };
+  gameState.goal = { x: COLS-1, y: ROWS-1 };
+  gameState.steps = 0;
+}
+
+/* ===== Draw Maze ===== */
+function drawMaze() {
+  ctx.fillStyle = '#0d1117';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      if(gameState.maze[r][c]===1){
+        ctx.fillStyle = '#1f2937';
+        ctx.fillRect(c*TILE, r*TILE, TILE, TILE);
+      }
     }
-    maze[1][1]=0; carve(1,1); return maze;
+  }
+  // Player
+  ctx.fillStyle = '#34d399';
+  ctx.fillRect(gameState.player.x*TILE+5, gameState.player.y*TILE+5, TILE-10, TILE-10);
+  // Goal
+  ctx.fillStyle = '#fbbf24';
+  ctx.fillRect(gameState.goal.x*TILE+5, gameState.goal.y*TILE+5, TILE-10, TILE-10);
+  stepDisplay.textContent = gameState.steps;
+  goalDisplay.textContent = `${gameState.goal.x},${gameState.goal.y}`;
 }
 
-function initGame(){
-    const size=difficulties[gameState.difficulty];
-    gameState.maze=generateMaze(size);
-    gameState.cellSize=Math.floor(400/size);
-    canvas.width=size*gameState.cellSize; canvas.height=size*gameState.cellSize;
-    gameState.playerPos={x:1,y:1};
-    gameState.goalPos={x:size-2,y:size-2};
-    gameState.maze[gameState.goalPos.y][gameState.goalPos.x]=0;
-    gameState.moves=0; gameState.isComplete=false; gameState.startTime=Date.now();
-    updateStats(); drawMaze(); startTimer();
+/* ===== Player Movement ===== */
+function movePlayer(dx,dy){
+  if(!gameState.gameActive) return;
+  const nx = gameState.player.x+dx;
+  const ny = gameState.player.y+dy;
+  if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && gameState.maze[ny][nx]===0){
+    gameState.player.x = nx;
+    gameState.player.y = ny;
+    gameState.steps++;
+    drawMaze();
+    checkWin();
+  }
 }
 
-function drawMaze(){
-    const size=gameState.maze.length;
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    for(let y=0;y<size;y++){
-        for(let x=0;x<size;x++){
-            ctx.fillStyle=gameState.maze[y][x]===1?'#2d3748':'#f7fafc';
-            ctx.fillRect(x*gameState.cellSize,y*gameState.cellSize,gameState.cellSize,gameState.cellSize);
-            ctx.strokeStyle='#e2e8f0'; ctx.strokeRect(x*gameState.cellSize,y*gameState.cellSize,gameState.cellSize,gameState.cellSize);
-        }
-    }
-    ctx.fillStyle='#fbbf24'; ctx.beginPath();
-    ctx.arc(gameState.goalPos.x*gameState.cellSize+gameState.cellSize/2,gameState.goalPos.y*gameState.cellSize+gameState.cellSize/2,gameState.cellSize/3,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle='#667eea'; ctx.beginPath();
-    ctx.arc(gameState.playerPos.x*gameState.cellSize+gameState.cellSize/2,gameState.playerPos.y*gameState.cellSize+gameState.cellSize/2,gameState.cellSize/3,0,Math.PI*2); ctx.fill();
+function checkWin(){
+  if(gameState.player.x===gameState.goal.x && gameState.player.y===gameState.goal.y){
+    gameState.gameActive = false;
+    setTimeout(() => showMessage('🏆 You Escaped the Maze!', '#fbbf24'), 100);
+    playAgainBtn.classList.remove('hidden');
+  }
 }
 
-function move(dir){
-    if(!gameState.gameActive||gameState.isComplete) return;
-    let {
+/* ===== Message Overlay ===== */
+function showMessage(text,color){
+  const msgDiv = document.createElement('div');
+  msgDiv.textContent = text;
+  msgDiv.style.cssText=`position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-size:48px;font-weight:900;color:${color};text-shadow:0 0 30px ${color};pointer-events:none;z-index:1000;animation:bounce 1s ease-out;`;
+  document.body.appendChild(msgDiv);
+  setTimeout(()=>msgDiv.remove(),1500);
+}
+
+/* ===== Event Listeners ===== */
+window.addEventListener('keydown', e => {
+  switch(e.key){
+    case 'ArrowUp': movePlayer(0,-1); break;
+    case 'ArrowDown': movePlayer(0,1); break;
+    case 'ArrowLeft': movePlayer(-1,0); break;
+    case 'ArrowRight': movePlayer(1,0); break;
+  }
+});
+
+resetBtn.addEventListener('click', ()=>{ generateMaze(); drawMaze(); });
+
+playBtn.addEventListener('click', (e)=>{
+  e.preventDefault();
+  payThen(()=>{ 
+    document.getElementById('intro-overlay').classList.add('hidden');
+    gameState.gameActive = true;
+    generateMaze(); drawMaze();
+  }, playBtn);
+});
+
+playAgainBtn.addEventListener('click', (e)=>{
+  e.preventDefault();
+  payThen(()=>{
+    playAgainBtn.classList.add('hidden');
+    gameState.gameActive=true;
+    generateMaze(); drawMaze();
+  }, playAgainBtn);
+});
+
+/* ===== Start Loop ===== */
+drawMaze();
+</script>
+</body>
+</html>
