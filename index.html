@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maze Game - Pay to Play</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: Arial, sans-serif;
+    background: linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+    display: flex; justify-content: center; align-items: center; min-height:100vh;
+  }
+  .game-container {
+    background:white; border-radius:20px; padding:20px; box-shadow:0 20px 60px rgba(0,0,0,0.3);
+    max-width:500px; width:100%; text-align:center; position:relative;
+  }
+  canvas { border:3px solid #667eea; border-radius:10px; background:white; margin:0 auto; display:block; }
+  .controls { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; max-width:200px; margin:15px auto 0; }
+  .control-btn { background:#667eea; color:white; border:none; padding:15px; font-size:20px; border-radius:10px; cursor:pointer; font-weight:bold; }
+  .control-btn.empty { background:transparent; cursor:default; }
+  .control-btn:hover { background:#5568d3; transform:scale(1.05); }
+  .control-btn:active { transform:scale(0.95); }
+  .button-group { display:flex; gap:10px; margin-top:15px; }
+  .action-btn { flex:1; background:#764ba2; color:white; border:none; padding:12px; border-radius:10px; cursor:pointer; font-weight:bold; }
+  .action-btn.success { background:#10b981; }
+  .overlay { position:fixed; inset:0; display:grid; place-items:center; background:rgba(0,0,0,0.8); z-index:100; }
+  .overlay button { padding:15px 30px; font-size:18px; font-weight:bold; background:#ff8c42; color:white; border:none; border-radius:12px; cursor:pointer; }
+  .message { text-align:center; margin-top:15px; padding:10px; border-radius:10px; font-weight:bold; display:none; }
+  .message.show { display:block; }
+  .message.win { background:#d1fae5; color:#065f46; }
+</style>
+</head>
+<body>
+<div class="game-container">
+    <div class="header"><h1>🎮 Maze Challenge</h1></div>
+    <canvas id="mazeCanvas" width="400" height="400"></canvas>
+    <div class="controls">
+      <div class="control-btn empty"></div>
+      <button class="control-btn" onclick="move('up')">↑</button>
+      <div class="control-btn empty"></div>
+      <button class="control-btn" onclick="move('left')">←</button>
+      <button class="control-btn" onclick="move('down')">↓</button>
+      <button class="control-btn" onclick="move('right')">→</button>
+    </div>
+    <div class="button-group">
+      <button class="action-btn" onclick="resetGame()">🔄 Reset</button>
+      <button class="action-btn success" onclick="nextLevel()">Next Level →</button>
+    </div>
+    <div class="message" id="message"></div>
+</div>
+
+<!-- Payment Overlay -->
+<div id="payOverlay" class="overlay">
+  <div>
+    <h2>💰 Pay to Play</h2>
+    <button id="payBtn">Pay & Start Game</button>
+  </div>
+</div>
+
+<script type="module">
+import { sdk } from 'https://esm.sh/@farcaster/miniapp-sdk';
+sdk.actions.ready();
+
+const canvas = document.getElementById('mazeCanvas');
+const ctx = canvas.getContext('2d');
+const payOverlay = document.getElementById('payOverlay');
+const payBtn = document.getElementById('payBtn');
+const messageEl = document.getElementById('message');
+
+let gameState = {
+    level:1, moves:0, startTime:Date.now(), difficulty:'easy',
+    playerPos:{x:0,y:0}, goalPos:{x:0,y:0}, maze:[], cellSize:40, isComplete:false,
+    gameActive:false
+};
+
+const difficulties = { easy:10, medium:15, hard:20 };
+
+// ===== Payment Gate =====
+const RECIPIENT = "0xc4EB7B433f9911a15c18729D8BE5e5fDa1187E1a";
+const AMOUNT_ETH = "0.00001";
+const TARGET = { chainId:"0x2105", explorer:"https://basescan.org/tx/" };
+
+function parseEther(x) { const [w,f=""]=String(x).split('.'); const frac=(f+'0'.repeat(18)).slice(0,18); return '0x'+(BigInt(w)*10n**18n+BigInt(frac)).toString(16); }
+async function getProvider() { try { return await sdk.wallet.getEthereumProvider() ?? window.ethereum ?? null; } catch { return window.ethereum ?? null; }
+}
+async function ensureChain(provider, chainId) { const current=(await provider.request({method:'eth_chainId'}))?.toLowerCase(); if(current===chainId.toLowerCase()) return; await provider.request({method:'wallet_switchEthereumChain',params:[{chainId}]}); }
+async function requiredPayment() {
+    const provider = await getProvider(); if(!provider) throw new Error('No wallet');
+    const [from] = await provider.request({ method:'eth_requestAccounts' });
+    const hash = await provider.request({ method:'eth_sendTransaction', params:[{from,to:RECIPIENT,value:parseEther(AMOUNT_ETH)}] });
+    return hash;
+}
+async function payThenStart() {
+    try {
+        payBtn.disabled = true;
+        await requiredPayment();
+        payOverlay.style.display='none';
+        gameState.gameActive=true;
+        initGame();
+    } catch(e) { alert('Payment failed.'); payBtn.disabled=false; }
+}
+payBtn.onclick = payThenStart;
+
+// ===== Maze Game Logic =====
+function generateMaze(size) {
+    const maze = Array(size).fill().map(()=>Array(size).fill(1));
+    function carve(x,y){
+        const dirs=[[0,-2],[2,0],[0,2],[-2,0]].sort(()=>Math.random()-0.5);
+        for(const [dx,dy] of dirs){
+            const nx=x+dx, ny=y+dy;
+            if(nx>0&&nx<size-1&&ny>0&&ny<size-1&&maze[ny][nx]===1){
+                maze[y+dy/2][x+dx/2]=0;
+                maze[ny][nx]=0;
+                carve(nx,ny);
+            }
+        }
+    }
+    maze[1][1]=0; carve(1,1); return maze;
+}
+
+function initGame(){
+    const size=difficulties[gameState.difficulty];
+    gameState.maze=generateMaze(size);
+    gameState.cellSize=Math.floor(400/size);
+    canvas.width=size*gameState.cellSize; canvas.height=size*gameState.cellSize;
+    gameState.playerPos={x:1,y:1};
+    gameState.goalPos={x:size-2,y:size-2};
+    gameState.maze[gameState.goalPos.y][gameState.goalPos.x]=0;
+    gameState.moves=0; gameState.isComplete=false; gameState.startTime=Date.now();
+    updateStats(); drawMaze(); startTimer();
+}
+
+function drawMaze(){
+    const size=gameState.maze.length;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    for(let y=0;y<size;y++){
+        for(let x=0;x<size;x++){
+            ctx.fillStyle=gameState.maze[y][x]===1?'#2d3748':'#f7fafc';
+            ctx.fillRect(x*gameState.cellSize,y*gameState.cellSize,gameState.cellSize,gameState.cellSize);
+            ctx.strokeStyle='#e2e8f0'; ctx.strokeRect(x*gameState.cellSize,y*gameState.cellSize,gameState.cellSize,gameState.cellSize);
+        }
+    }
+    ctx.fillStyle='#fbbf24'; ctx.beginPath();
+    ctx.arc(gameState.goalPos.x*gameState.cellSize+gameState.cellSize/2,gameState.goalPos.y*gameState.cellSize+gameState.cellSize/2,gameState.cellSize/3,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#667eea'; ctx.beginPath();
+    ctx.arc(gameState.playerPos.x*gameState.cellSize+gameState.cellSize/2,gameState.playerPos.y*gameState.cellSize+gameState.cellSize/2,gameState.cellSize/3,0,Math.PI*2); ctx.fill();
+}
+
+function move(dir){
+    if(!gameState.gameActive||gameState.isComplete) return;
+    let {
