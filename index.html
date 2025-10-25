@@ -648,7 +648,10 @@ canvas.addEventListener('touchend', (e) => {
 });
 
 resetBtn.addEventListener('click', resetGame);
-nextBtn.addEventListener('click', nextLevel);
+nextBtn.addEventListener('click', (e) => {
+  e.preventDefault();
+  payThen(nextLevel, nextBtn);
+});
 
 /* ===== Start Game (Pay-Gated) ===== */
 playBtn.addEventListener('click', (e) => {
